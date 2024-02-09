@@ -1,118 +1,138 @@
-import Image from 'next/image'
-import { Inter } from 'next/font/google'
+import * as canvas from "canvas";
+import * as faceapi from "face-api.js";
+import * as tf from "@tensorflow/tfjs";
+import * as tmImage from "@teachablemachine/image";
+import axios from "axios";
+import { useState, useEffect } from "react";
+import { motion, useAnimation, useAnimate } from "framer-motion";
+import styles from "../styles/Home.module.css";
 
-const inter = Inter({ subsets: ['latin'] })
+const getRandomTransformOrigin = () => {
+  const value = (16 + 40 * Math.random()) / 100;
+  const value2 = (15 + 36 * Math.random()) / 100;
+  return {
+    originX: value,
+    originY: value2,
+  };
+};
 
-export default function Home() {
+const getRandomDelay = () => -(Math.random() * 0.7 + 0.05);
+
+const randomDuration = () => Math.random() * 0.07 + 0.23;
+
+export const variants = {
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      ease: "easeOut",
+      duration: 0.3,
+    },
+  },
+  hide: {
+    y: -20,
+    opacity: 0,
+  },
+};
+
+const Index = () => {
+  const [name, setName] = useState("");
+  const [happyness, setHappyness] = useState(0);
+  const [scope, animate] = useAnimate();
+
+  useEffect(() => {
+    Webcam();
+  }, []);
+
+  async function Webcam() {
+    // Loads models
+    Promise.all([
+      faceapi.nets.ssdMobilenetv1.loadFromUri("/models"),
+      faceapi.nets.faceLandmark68TinyNet.loadFromUri("/models"),
+      faceapi.nets.faceLandmark68Net.loadFromUri("/models"),
+      faceapi.nets.faceRecognitionNet.loadFromUri("/models"),
+      faceapi.nets.faceExpressionNet.loadFromUri("/models"),
+    ]).then(startVideo);
+
+    const video = document.getElementById("video");
+
+    function startVideo() {
+      navigator.getUserMedia(
+        { video: {} },
+        (stream) => (video.srcObject = stream),
+        (err) => console.error(err)
+      );
+    }
+
+    video.addEventListener("play", () => {
+      const canvas = faceapi.createCanvasFromMedia(video);
+      document.body.append(canvas);
+      const displaySize = { width: video.width, height: video.height };
+      faceapi.matchDimensions(canvas, displaySize);
+
+      setInterval(async () => {
+        let fullFaceDescriptions = await faceapi
+          .detectSingleFace(video)
+          .withFaceLandmarks()
+          .withFaceExpressions();
+
+        /* const dims = faceapi.matchDimensions(canvas, video, true);
+        const resizedResults = faceapi.resizeResults(
+          fullFaceDescriptions,
+          dims
+        ); */
+
+        if (fullFaceDescriptions) {
+          const happy = fullFaceDescriptions.expressions.happy;
+
+          const happyPercent = happy * 100;
+
+          /*   faceapi.draw.drawDetections(canvas, fullFaceDescriptions);
+          faceapi.draw.drawFaceLandmarks(canvas, fullFaceDescriptions);
+          faceapi.draw.drawFaceExpressions(canvas, fullFaceDescriptions, 0.05); */
+
+          setHappyness(parseInt(happyPercent));
+        }
+      }, 500);
+    });
+  }
+
   return (
-    <main
-      className={`flex min-h-screen flex-col items-center justify-between p-24 ${inter.className}`}
-    >
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">src/pages/index.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
-
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700/10 after:dark:from-sky-900 after:dark:via-[#0141ff]/40 before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
+    <div className="w-screen h-screen flex justify-center content-center items-center flex-col">
+      <h1 className={`${styles.landing_title}`}>0 felicidad challenge</h1>
+      <motion.div
+        className="top-0 left-0 w-screen h-10 fixed bg-orange-600 "
+        style={{ scaleX: happyness / 50 }}
+        layout
+        transition={{ duration: 0.3 }}
+        initial={{ x: "100%" }}
+        animate={{ x: "calc(100vw - 50%)" }}
+        key={happyness / 100}
+        variants={variants}
+      />
+      <div className="">
+        <video
+          id="video"
+          height="640px"
+          width="480px"
+          autoPlay
+          muted
+          className="rounded-lg drop-shadow-2xl	"
         />
       </div>
 
-      <div className="mb-32 grid text-center lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
+      <div className="">
+        <motion.h1
+          variants={variants}
+          className="text-4xl font-bold text-gray-900"
+          key={happyness}
+          animate={"show"}
+          initial="hide"
         >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Discover and deploy boilerplate example Next.js&nbsp;projects.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
+          {happyness}%
+        </motion.h1>
       </div>
-    </main>
-  )
-}
+    </div>
+  );
+};
+export default Index;
